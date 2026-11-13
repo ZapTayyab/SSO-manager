@@ -1,21 +1,35 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,12 +39,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -78,6 +94,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -85,9 +102,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -98,6 +127,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.domain.CourseSession
 import com.example.domain.ScheduleConflict
@@ -106,20 +136,37 @@ import com.example.domain.SemesterStatus
 import com.example.domain.SessionType
 import com.example.domain.TimetableFormatters
 import com.example.domain.conflict.TimetableConflictChecker
+import com.example.ui.theme.BrandLogoGold
+import com.example.ui.theme.BrandLogoNavy
+import com.example.ui.theme.BrandLogoNavyLight
+import com.example.ui.theme.DarkCrimson
+import com.example.ui.theme.DarkPrimaryBlue
+import com.example.ui.theme.DarkTeal
 import com.example.ui.theme.LabAccent
 import com.example.ui.theme.LectureAccent
 import com.example.ui.theme.OfficeHoursAccent
+import com.example.ui.theme.OxfordNavy
+import com.example.ui.theme.OxfordNavyLight
 import com.example.ui.theme.SeminarAccent
+import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun ThemeTogglePillSwitch(
     isDarkMode: Boolean,
     onToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onBlueHeader: Boolean = false
 ) {
     val trackColor by animateColorAsState(
-        targetValue = if (isDarkMode) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceVariant,
+        targetValue = when {
+            onBlueHeader && isDarkMode -> Color.White.copy(alpha = 0.22f)
+            onBlueHeader -> Color.White.copy(alpha = 0.14f)
+            isDarkMode -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceVariant
+        },
         animationSpec = tween(250),
         label = "theme_switch_track"
     )
@@ -131,6 +178,13 @@ fun ThemeTogglePillSwitch(
         ),
         label = "theme_switch_thumb"
     )
+    val borderColor = if (onBlueHeader) {
+        Color.White.copy(alpha = 0.28f)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    }
+    val thumbColor = if (onBlueHeader) Color.White else MaterialTheme.colorScheme.primary
+    val thumbIconColor = if (onBlueHeader) BrandLogoNavy else MaterialTheme.colorScheme.onPrimary
 
     Surface(
         modifier = modifier
@@ -143,8 +197,8 @@ fun ThemeTogglePillSwitch(
             .testTag("theme_mode_toggle_switch"),
         shape = CircleShape,
         color = trackColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-        tonalElevation = 2.dp
+        border = BorderStroke(1.dp, borderColor),
+        tonalElevation = if (onBlueHeader) 0.dp else 2.dp
     ) {
         Box(
             modifier = Modifier
@@ -161,7 +215,12 @@ fun ThemeTogglePillSwitch(
                 Icon(
                     imageVector = Icons.Filled.LightMode,
                     contentDescription = null,
-                    tint = if (!isDarkMode) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    tint = when {
+                        onBlueHeader && !isDarkMode -> BrandLogoGold
+                        onBlueHeader -> Color.White.copy(alpha = 0.55f)
+                        !isDarkMode -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
                     modifier = Modifier
                         .padding(start = 4.dp)
                         .size(16.dp)
@@ -169,7 +228,12 @@ fun ThemeTogglePillSwitch(
                 Icon(
                     imageVector = Icons.Filled.DarkMode,
                     contentDescription = null,
-                    tint = if (isDarkMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    tint = when {
+                        onBlueHeader && isDarkMode -> DarkPrimaryBlue
+                        onBlueHeader -> Color.White.copy(alpha = 0.55f)
+                        isDarkMode -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
                     modifier = Modifier
                         .padding(end = 4.dp)
                         .size(16.dp)
@@ -180,14 +244,14 @@ fun ThemeTogglePillSwitch(
                     .offset(x = thumbOffset)
                     .size(26.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
+                color = thumbColor,
                 shadowElevation = 2.dp
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = if (isDarkMode) Icons.Filled.DarkMode else Icons.Filled.LightMode,
                         contentDescription = if (isDarkMode) "Switch to light mode" else "Switch to dark mode",
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        tint = thumbIconColor,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -199,19 +263,28 @@ fun ThemeTogglePillSwitch(
 @Composable
 fun EnterpriseBrandMark(
     modifier: Modifier = Modifier,
-    sizeDp: Int = 38
+    sizeDp: Int = 40
 ) {
+    val cornerRadius = (sizeDp * 0.29f).dp
     Surface(
         modifier = modifier.size(sizeDp.dp),
-        shape = RoundedCornerShape(11.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
-        shadowElevation = 2.dp
+        shape = RoundedCornerShape(cornerRadius),
+        border = BorderStroke(
+            width = 1.dp,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    BrandLogoGold.copy(alpha = 0.72f),
+                    Color.White.copy(alpha = 0.32f)
+                )
+            )
+        ),
+        shadowElevation = 4.dp
     ) {
         Image(
             painter = painterResource(id = R.drawable.ic_launcher_art),
             contentDescription = stringResource(R.string.app_name),
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
@@ -220,81 +293,656 @@ fun EnterpriseBrandMark(
 fun EnterpriseCleanHeader(
     title: String,
     subtitle: String,
+    eyebrow: String = "FACULTY WORKSPACE",
+    conflictCount: Int = 0,
     isDarkMode: Boolean,
     onToggleTheme: () -> Unit,
     showExportPdf: Boolean = false,
     onExportPdfClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    applyStatusBarPadding: Boolean = false
 ) {
+    val breathTransition = rememberInfiniteTransition(label = "blue_header_breath")
+    val auroraDrift by breathTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blue_header_drift"
+    )
+    val dotPulse by breathTransition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blue_header_dot_pulse"
+    )
+
+    val baseBlueGradient = Brush.linearGradient(
+        colors = listOf(
+            BrandLogoNavy,
+            OxfordNavy,
+            BrandLogoNavyLight
+        )
+    )
+    val bottomShape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+    val bottomShimmerLine = Brush.horizontalGradient(
+        colors = listOf(
+            Color.Transparent,
+            Color.White.copy(alpha = 0.16f),
+            BrandLogoGold.copy(alpha = 0.42f),
+            Color.White.copy(alpha = 0.16f),
+            Color.Transparent
+        )
+    )
+    val statusDotColor = if (conflictCount > 0) DarkCrimson else DarkTeal
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.background
+        shape = bottomShape,
+        shadowElevation = 6.dp,
+        color = BrandLogoNavy
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(baseBlueGradient)
+                .testTag("enterprise_clean_header")
+        ) {
+            // Calm, non-chaotic breathing blue atmospheric sheen across the header canvas
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val w = size.width
+                val h = size.height
+                val primaryGlowCenter = Offset(
+                    x = w * (0.22f + 0.56f * auroraDrift),
+                    y = h * 0.28f
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            DarkPrimaryBlue.copy(alpha = 0.22f),
+                            OxfordNavyLight.copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = primaryGlowCenter,
+                        radius = w * 0.52f
+                    ),
+                    radius = w * 0.52f,
+                    center = primaryGlowCenter
+                )
+
+                val warmAccentCenter = Offset(
+                    x = w * (0.82f - 0.35f * auroraDrift),
+                    y = h * 0.85f
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            BrandLogoGold.copy(alpha = 0.08f),
+                            Color.Transparent
+                        ),
+                        center = warmAccentCenter,
+                        radius = w * 0.34f
+                    ),
+                    radius = w * 0.34f,
+                    center = warmAccentCenter
+                )
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .then(
+                        if (applyStatusBarPadding) Modifier.windowInsetsPadding(WindowInsets.statusBars)
+                        else Modifier
+                    )
             ) {
                 Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    EnterpriseBrandMark(sizeDp = 38)
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .background(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.16f * dotPulse),
+                                                Color.Transparent
+                                            )
+                                        ),
+                                        shape = CircleShape
+                                    )
+                            )
+                            EnterpriseBrandMark(sizeDp = 42)
+                        }
+
+                        AnimatedContent(
+                            targetState = eyebrow to title,
+                            transitionSpec = {
+                                (fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 5 })
+                                    .togetherWith(
+                                        fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 5 }
+                                    )
+                            },
+                            label = "blue_header_title_transition"
+                        ) { (animatedEyebrow, animatedTitle) ->
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .alpha(dotPulse)
+                                            .clip(CircleShape)
+                                            .background(statusDotColor)
+                                    )
+                                    Text(
+                                        text = animatedEyebrow.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            letterSpacing = 1.15.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = Color.White.copy(alpha = 0.84f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = animatedTitle,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        letterSpacing = (-0.3).sp
+                                    ),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.74f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (showExportPdf) {
+                            Surface(
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(
+                                        role = Role.Button,
+                                        onClick = onExportPdfClick
+                                    )
+                                    .testTag("export_pdf_button"),
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White.copy(alpha = 0.14f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.26f))
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PictureAsPdf,
+                                        contentDescription = "Export weekly timetable to PDF",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                        ThemeTogglePillSwitch(
+                            isDarkMode = isDarkMode,
+                            onToggle = onToggleTheme,
+                            onBlueHeader = true
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(bottomShimmerLine)
+                )
+            }
+        }
+    }
+}
 
+@Composable
+fun SectionEditorialHeader(
+    eyebrow: String,
+    title: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier,
+    trailingContent: (@Composable () -> Unit)? = null
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (showExportPdf) {
-                        IconButton(
-                            onClick = onExportPdfClick,
-                            modifier = Modifier.testTag("export_pdf_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.PictureAsPdf,
-                                contentDescription = "Export weekly timetable to PDF",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                    ThemeTogglePillSwitch(
-                        isDarkMode = isDarkMode,
-                        onToggle = onToggleTheme
+                    Box(
+                        modifier = Modifier
+                            .width(16.dp)
+                            .height(2.5.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                    Text(
+                        text = eyebrow.uppercase(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            letterSpacing = 1.15.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        letterSpacing = (-0.35).sp
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-            )
+            if (trailingContent != null) {
+                Spacer(modifier = Modifier.width(12.dp))
+                trailingContent()
+            }
         }
     }
+}
+
+@Composable
+fun LiquidLogoSignInOverlay(
+    facultyLabel: String,
+    onFillComplete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Prevent accidental back press while SSO authentication transition completes
+    BackHandler(enabled = true) {}
+
+    val fillProgress = remember { Animatable(0f) }
+    val pulseScale = remember { Animatable(1f) }
+    var hasNotifiedComplete by remember { mutableStateOf(false) }
+
+    val waveTransition = rememberInfiniteTransition(label = "liquid_wave_transition")
+    val wavePhase by waveTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2.0 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1050, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "liquid_wave_phase"
+    )
+
+    LaunchedEffect(facultyLabel) {
+        hasNotifiedComplete = false
+        fillProgress.snapTo(0f)
+        fillProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 1650, easing = FastOutSlowInEasing)
+        )
+        pulseScale.animateTo(
+            targetValue = 1.045f,
+            animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+        )
+        pulseScale.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+        )
+        delay(80)
+        if (!hasNotifiedComplete) {
+            hasNotifiedComplete = true
+            onFillComplete()
+        }
+    }
+
+    val progressPercent = (fillProgress.value * 100f).roundToInt().coerceIn(0, 100)
+    val statusCaption = when {
+        fillProgress.value < 0.36f -> "Verifying Institutional SSO"
+        fillProgress.value < 0.78f -> "Syncing Teaching Timetable"
+        else -> "Entering Faculty Workspace"
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {}
+            )
+            .testTag("liquid_logo_signin_overlay"),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Pure white background emblem filled bottom-to-top with the exact app logo deep navy blue (#0C243C)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.scale(pulseScale.value)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(168.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    BrandLogoNavy.copy(alpha = 0.12f + 0.16f * fillProgress.value),
+                                    Color.Transparent
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                )
+
+                Surface(
+                    modifier = Modifier.size(136.dp),
+                    shape = RoundedCornerShape(34.dp),
+                    color = Color.White,
+                    shadowElevation = 14.dp,
+                    border = BorderStroke(
+                        width = 1.5.dp,
+                        color = BrandLogoNavy.copy(alpha = 0.14f + 0.35f * fillProgress.value)
+                    )
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val w = size.width
+                            val h = size.height
+                            val p = fillProgress.value.coerceIn(0f, 1f)
+
+                            // 1. Etched faint emblem silhouette on empty white background
+                            drawLogoMonogram(
+                                primaryColor = BrandLogoNavy.copy(alpha = 0.16f),
+                                goldColor = BrandLogoGold.copy(alpha = 0.25f)
+                            )
+
+                            // 2. Rising dual-wave liquid in the exact app logo blue (#0C243C)
+                            if (p > 0.005f) {
+                                val baseWaterY = h * (1f - p)
+                                val amplitude = (h * 0.042f) * (1f - p * 0.85f)
+
+                                val backWave = Path().apply {
+                                    moveTo(0f, h)
+                                    lineTo(0f, baseWaterY)
+                                    val steps = 28
+                                    for (i in 0..steps) {
+                                        val x = w * (i / steps.toFloat())
+                                        val angle = (x / w) * (2f * PI.toFloat()) - wavePhase + 1.2f
+                                        val y = (baseWaterY + sin(angle) * amplitude * 0.85f)
+                                            .coerceIn(-4f, h + 4f)
+                                        lineTo(x, y)
+                                    }
+                                    lineTo(w, h)
+                                    close()
+                                }
+                                drawPath(
+                                    path = backWave,
+                                    color = BrandLogoNavyLight.copy(alpha = 0.58f)
+                                )
+
+                                val frontWave = Path().apply {
+                                    moveTo(0f, h)
+                                    lineTo(0f, baseWaterY)
+                                    val steps = 32
+                                    for (i in 0..steps) {
+                                        val x = w * (i / steps.toFloat())
+                                        val angle = (x / w) * (2.2f * PI.toFloat()) + wavePhase
+                                        val y = (baseWaterY + sin(angle) * amplitude)
+                                            .coerceIn(-4f, h + 4f)
+                                        lineTo(x, y)
+                                    }
+                                    lineTo(w, h)
+                                    close()
+                                }
+                                drawPath(
+                                    path = frontWave,
+                                    color = BrandLogoNavy
+                                )
+
+                                // 3. Crisp white & champagne-gold logo monogram revealed inside the rising blue liquid
+                                clipPath(frontWave) {
+                                    drawLogoMonogram(
+                                        primaryColor = Color.White,
+                                        goldColor = BrandLogoGold
+                                    )
+                                }
+                            }
+                        }
+
+                        // Subtle crossfade to full raster emblem once liquid finishes filling
+                        if (fillProgress.value > 0.96f) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_launcher_art),
+                                contentDescription = stringResource(R.string.app_name),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .alpha(((fillProgress.value - 0.96f) / 0.04f).coerceIn(0f, 1f))
+                            )
+                        }
+                    }
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                    )
+                ) {
+                    Text(
+                        text = "$progressPercent%  ·  $facultyLabel",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
+
+                Text(
+                    text = statusCaption,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        letterSpacing = (-0.2).sp
+                    ),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawLogoMonogram(
+    primaryColor: Color,
+    goldColor: Color
+) {
+    val w = size.width
+    val h = size.height
+    val left = w * 0.285f
+    val right = w * 0.715f
+    val top = h * 0.25f
+    val bottom = h * 0.75f
+    val width = right - left
+    val height = bottom - top
+
+    val colGap = width * 0.06f
+    val colW = (width - colGap * 2f) / 3f
+    val c1X = left
+    val c2X = left + colW + colGap
+    val c3X = left + (colW + colGap) * 2f
+
+    val rowH = height * 0.138f
+    val rowGap = height * 0.032f
+    val r3Y = bottom - rowH
+    val r2Y = r3Y - rowGap - rowH
+    val r1Y = r2Y - rowGap - rowH * 1.18f
+    val r1H = rowH * 1.18f
+
+    // Bottom row: 3 crisp timetable tiles
+    drawRoundRect(
+        color = primaryColor,
+        topLeft = Offset(c1X, r3Y),
+        size = Size(colW, rowH),
+        cornerRadius = CornerRadius(2f, 2f)
+    )
+    drawRoundRect(
+        color = primaryColor,
+        topLeft = Offset(c2X, r3Y),
+        size = Size(colW, rowH),
+        cornerRadius = CornerRadius(2f, 2f)
+    )
+    drawRoundRect(
+        color = primaryColor,
+        topLeft = Offset(c3X, r3Y),
+        size = Size(colW, rowH),
+        cornerRadius = CornerRadius(2f, 2f)
+    )
+
+    // Middle row: 3 timetable tiles
+    drawRoundRect(
+        color = primaryColor,
+        topLeft = Offset(c1X, r2Y),
+        size = Size(colW, rowH),
+        cornerRadius = CornerRadius(2f, 2f)
+    )
+    drawRoundRect(
+        color = primaryColor,
+        topLeft = Offset(c2X, r2Y),
+        size = Size(colW, rowH),
+        cornerRadius = CornerRadius(2f, 2f)
+    )
+    drawRoundRect(
+        color = primaryColor,
+        topLeft = Offset(c3X, r2Y),
+        size = Size(colW, rowH),
+        cornerRadius = CornerRadius(2f, 2f)
+    )
+
+    // Highlighted gold scheduling bridge across columns 2 & 3
+    val notchW = colGap * 0.65f
+    val goldPath = Path().apply {
+        moveTo(c2X, r1Y)
+        lineTo(c2X + colW - notchW * 0.15f, r1Y)
+        lineTo(c2X + colW - notchW * 0.15f, r1Y + r1H * 0.42f)
+        lineTo(c3X + notchW * 0.15f, r1Y + r1H * 0.42f)
+        lineTo(c3X + notchW * 0.15f, r1Y)
+        lineTo(right, r1Y)
+        lineTo(right, r1Y + r1H)
+        lineTo(c2X, r1Y + r1H)
+        close()
+    }
+    drawPath(path = goldPath, color = goldColor, style = Fill)
+
+    // Sweeping architectural arch + top vertical pillar
+    val strokeW = width * 0.062f
+    val archYBase = r1Y + r1H - strokeW * 0.48f
+    val archPath = Path().apply {
+        moveTo(c1X + strokeW * 0.45f, archYBase)
+        cubicTo(
+            c1X + width * 0.13f, top + height * 0.16f,
+            c1X + width * 0.48f, top + strokeW * 0.4f,
+            right - strokeW * 0.48f, top + strokeW * 0.4f
+        )
+        lineTo(right - strokeW * 0.48f, r1Y - rowGap * 1.15f)
+    }
+    drawPath(
+        path = archPath,
+        color = primaryColor,
+        style = Stroke(
+            width = strokeW,
+            cap = StrokeCap.Square,
+            join = StrokeJoin.Miter
+        )
+    )
+
+    // Inner secondary arch rib + horizontal arch base
+    val innerRibPath = Path().apply {
+        moveTo(c1X + strokeW * 0.45f, archYBase)
+        lineTo(c1X + colW * 0.96f, archYBase)
+        cubicTo(
+            c1X + width * 0.40f, top + height * 0.22f,
+            c1X + width * 0.60f, top + strokeW * 0.8f,
+            right - strokeW * 1.4f, top + strokeW * 0.45f
+        )
+    }
+    drawPath(
+        path = innerRibPath,
+        color = primaryColor,
+        style = Stroke(
+            width = strokeW * 0.82f,
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round
+        )
+    )
 }
 
 data class AnimatedNavItem(

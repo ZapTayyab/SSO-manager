@@ -90,9 +90,10 @@ fun ProfileScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item(key = "profile_header") {
-            Text(
-                text = "Faculty SSO & Preferences",
-                style = MaterialTheme.typography.headlineSmall
+            SectionEditorialHeader(
+                eyebrow = "Institutional Credentials",
+                title = "Faculty SSO & Preferences",
+                subtitle = "Manage identity cache, theme appearance, and scheduling rules"
             )
         }
 

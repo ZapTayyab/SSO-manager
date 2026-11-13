@@ -44,3 +44,8 @@ val LectureAccent = Color(0xFF1D4ED8)
 val LabAccent = Color(0xFF0F766E)
 val SeminarAccent = Color(0xFF7C3AED)
 val OfficeHoursAccent = Color(0xFFB45309)
+
+// Enterprise Brand Logo Colors (matched directly to ic_launcher_art)
+val BrandLogoNavy = Color(0xFF0C243C)
+val BrandLogoNavyLight = Color(0xFF1A3E63)
+val BrandLogoGold = Color(0xFFDFB859)

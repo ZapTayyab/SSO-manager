@@ -1,16 +1,20 @@
 package com.example
 
+import android.graphics.Color as AndroidColor
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,7 +32,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
@@ -87,6 +90,7 @@ import com.example.platform.TimetablePdfExporter
 import com.example.ui.screens.AnimatedNavItem
 import com.example.ui.screens.EnterpriseCleanHeader
 import com.example.ui.screens.InsightsScreen
+import com.example.ui.screens.LiquidLogoSignInOverlay
 import com.example.ui.screens.ModernAnimatedNavBar
 import com.example.ui.screens.PdfExportBottomSheet
 import com.example.ui.screens.ProfileScreen
@@ -109,7 +113,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+        )
         setContent {
             val viewModel: TimetableViewModel = viewModel(
                 factory = TimetableViewModel.factory(appContainer)
@@ -153,26 +159,48 @@ fun SsoTimetableApp(
         return
     }
 
-    val activeFaculty = uiState.activeFaculty
-    if (activeFaculty == null) {
-        SsoLoginScreen(
-            directoryFaculty = uiState.directoryFaculty,
-            savedCredential = uiState.savedCredential,
-            isDarkMode = isDarkMode,
-            loginError = uiState.loginError,
-            onToggleTheme = { viewModel.toggleLightDarkMode(isDarkMode) },
-            onSignInWithCredentials = viewModel::signInWithSsoCredentials,
-            onSelectDirectoryFaculty = viewModel::signInWithDirectoryFaculty
-        )
-    } else {
-        key(activeFaculty.id) {
-            AuthenticatedTimetableShell(
-                uiState = uiState,
-                isDarkMode = isDarkMode,
-                viewModel = viewModel,
-                conflictAlertNotifier = conflictAlertNotifier,
-                pdfExporter = pdfExporter
-            )
+    val isAuthenticated = uiState.activeFaculty != null
+    Crossfade(
+        targetState = isAuthenticated,
+        animationSpec = tween(durationMillis = 360),
+        label = "sso_auth_crossfade"
+    ) { signedIn ->
+        if (!signedIn) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                SsoLoginScreen(
+                    directoryFaculty = uiState.directoryFaculty,
+                    savedCredential = uiState.savedCredential,
+                    isDarkMode = isDarkMode,
+                    loginError = uiState.loginError,
+                    isAuthenticating = uiState.pendingSignInLabel != null,
+                    onToggleTheme = { viewModel.toggleLightDarkMode(isDarkMode) },
+                    onSignInWithCredentials = viewModel::signInWithSsoCredentials,
+                    onSelectDirectoryFaculty = viewModel::signInWithDirectoryFaculty
+                )
+                AnimatedVisibility(
+                    visible = uiState.pendingSignInLabel != null,
+                    enter = fadeIn(animationSpec = tween(220)),
+                    exit = fadeOut(animationSpec = tween(220))
+                ) {
+                    LiquidLogoSignInOverlay(
+                        facultyLabel = uiState.pendingSignInLabel.orEmpty(),
+                        onFillComplete = viewModel::completePendingSignIn
+                    )
+                }
+            }
+        } else {
+            val activeFaculty = uiState.activeFaculty
+            if (activeFaculty != null) {
+                key(activeFaculty.id) {
+                    AuthenticatedTimetableShell(
+                        uiState = uiState,
+                        isDarkMode = isDarkMode,
+                        viewModel = viewModel,
+                        conflictAlertNotifier = conflictAlertNotifier,
+                        pdfExporter = pdfExporter
+                    )
+                }
+            }
         }
     }
 }
@@ -355,23 +383,25 @@ private fun AuthenticatedTimetableShell(
                 modifier = Modifier.weight(1f),
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
-                    val headerTitle = when (currentRoute) {
-                        ROUTE_TIMETABLE -> stringResource(R.string.app_name)
-                        ROUTE_INSIGHTS -> "Schedule Advisor"
-                        ROUTE_WORKLOAD -> "Workload Balance"
-                        ROUTE_PROFILE -> "SSO & Preferences"
-                        else -> stringResource(R.string.app_name)
+                    val (headerEyebrow, headerTitle) = when (currentRoute) {
+                        ROUTE_TIMETABLE -> "Academic Schedule" to stringResource(R.string.app_name)
+                        ROUTE_INSIGHTS -> "Historical Intelligence" to "Schedule Advisor"
+                        ROUTE_WORKLOAD -> "Department Analytics" to "Workload Balance"
+                        ROUTE_PROFILE -> "Institutional Identity" to "SSO & Preferences"
+                        else -> "Faculty Workspace" to stringResource(R.string.app_name)
                     }
                     val facultyName = uiState.activeFaculty?.fullName ?: "Faculty"
                     val termName = uiState.selectedSemester?.name ?: "Academic Portal"
                     EnterpriseCleanHeader(
                         title = headerTitle,
                         subtitle = "$facultyName · $termName",
+                        eyebrow = headerEyebrow,
+                        conflictCount = uiState.conflicts.size,
                         isDarkMode = isDarkMode,
                         onToggleTheme = { viewModel.toggleLightDarkMode(isDarkMode) },
                         showExportPdf = currentRoute == ROUTE_TIMETABLE && uiState.sessions.isNotEmpty(),
                         onExportPdfClick = { isExportSheetOpen = true },
-                        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+                        applyStatusBarPadding = true
                     )
                 },
                 snackbarHost = { SnackbarHost(hostState = snackbarHostState) },

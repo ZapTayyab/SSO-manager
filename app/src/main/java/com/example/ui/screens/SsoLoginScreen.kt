@@ -55,6 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.domain.FacultyMember
 import com.example.domain.SavedSsoCredential
@@ -65,6 +66,7 @@ fun SsoLoginScreen(
     savedCredential: SavedSsoCredential?,
     isDarkMode: Boolean,
     loginError: String?,
+    isAuthenticating: Boolean = false,
     onToggleTheme: () -> Unit,
     onSignInWithCredentials: (identifier: String, passcode: String, rememberInJson: Boolean) -> Unit,
     onSelectDirectoryFaculty: (facultyId: String, rememberInJson: Boolean) -> Unit
@@ -133,33 +135,56 @@ fun SsoLoginScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        EnterpriseBrandMark(sizeDp = 36)
-                        Column {
+                        EnterpriseBrandMark(sizeDp = 40)
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
                                 text = stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.titleSmall,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    letterSpacing = (-0.2).sp
+                                ),
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "INSTITUTIONAL PORTAL",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.78f)
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = Color.White.copy(alpha = 0.8f)
                             )
                         }
                     }
 
                     ThemeTogglePillSwitch(
                         isDarkMode = isDarkMode,
-                        onToggle = onToggleTheme
+                        onToggle = onToggleTheme,
+                        onBlueHeader = true
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.14f),
+                        shape = CircleShape,
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.24f))
+                    ) {
+                        Text(
+                            text = "FACULTY TIMETABLE CLOUD",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                letterSpacing = 1.2.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        )
+                    }
                     Text(
                         text = stringResource(R.string.sso_portal_title),
                         style = MaterialTheme.typography.displaySmall,
@@ -272,6 +297,7 @@ fun SsoLoginScreen(
 
                         Button(
                             onClick = { onSignInWithCredentials(ssoInput, passcode, rememberInJson) },
+                            enabled = !isAuthenticating,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp)
@@ -303,7 +329,9 @@ fun SsoLoginScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("sso_quick_faculty_${faculty.ssoId}")
-                                .clickable { onSelectDirectoryFaculty(faculty.id, rememberInJson) },
+                                .clickable(enabled = !isAuthenticating) {
+                                    onSelectDirectoryFaculty(faculty.id, rememberInJson)
+                                },
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
                             ),

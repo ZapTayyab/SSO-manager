@@ -103,17 +103,11 @@ fun WorkloadScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item(key = "workload_header") {
-            Column {
-                Text(
-                    text = "Workload Distribution",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = "$semesterName · Faculty weekly breakdown & capacity balance",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            SectionEditorialHeader(
+                eyebrow = "$semesterName · Capacity & Equity",
+                title = "Workload Distribution",
+                subtitle = "Faculty weekly teaching hours breakdown & capacity balance"
+            )
         }
 
         if (workload != null) {

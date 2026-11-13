@@ -100,23 +100,29 @@ fun TimetableScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item(key = "semester_strip") {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Academic Term",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${uiState.sessions.size} scheduled · ${faculty.ssoId}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionEditorialHeader(
+                    eyebrow = "Academic Term · ${faculty.ssoId}",
+                    title = uiState.selectedSemester?.name ?: "Teaching Schedule",
+                    trailingContent = {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+                            )
+                        ) {
+                            Text(
+                                text = "${uiState.sessions.size} classes",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                )
                 SemesterSelectorStrip(
                     semesters = uiState.semesters,
                     selectedSemesterId = uiState.selectedSemester?.id,

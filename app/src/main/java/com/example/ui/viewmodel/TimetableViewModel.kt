@@ -59,6 +59,7 @@ data class UiBannerMessage(
 @Immutable
 data class MainUiState(
     val isInitializing: Boolean = true,
+    val pendingSignInLabel: String? = null,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val savedCredential: SavedSsoCredential? = null,
     val directoryFaculty: List<FacultyMember> = emptyList(),
@@ -100,6 +101,7 @@ class TimetableViewModel(
     private val _isPreparingSemester = MutableStateFlow(false)
     private val _loginError = MutableStateFlow<String?>(null)
     private val _isInitialized = MutableStateFlow(false)
+    private val _pendingSignIn = MutableStateFlow<PendingSignInRequest?>(null)
 
     private var lastSnapshotForUndo: Pair<String, List<CourseSession>>? = null
     private var lastAlertedConflictSignature: String? = null
@@ -228,7 +230,8 @@ class TimetableViewModel(
         _aiResult,
         _isGeneratingAi,
         _isPreparingSemester,
-        _loginError
+        _loginError,
+        _pendingSignIn
     ) { arr ->
         @Suppress("UNCHECKED_CAST")
         UiControlsTuple(
@@ -238,7 +241,8 @@ class TimetableViewModel(
             aiResult = arr[3] as AiRecommendationResult?,
             isGeneratingAi = arr[4] as Boolean,
             isPreparing = arr[5] as Boolean,
-            loginError = arr[6] as String?
+            loginError = arr[6] as String?,
+            pendingSignInLabel = (arr[7] as PendingSignInRequest?)?.displayLabel
         )
     }
 
@@ -256,6 +260,7 @@ class TimetableViewModel(
 
         MainUiState(
             isInitializing = !meta.isInitialized,
+            pendingSignInLabel = controls.pendingSignInLabel,
             themeMode = meta.themeMode,
             savedCredential = meta.savedCredential,
             directoryFaculty = meta.directory,
@@ -296,28 +301,57 @@ class TimetableViewModel(
     }
 
     fun signInWithSsoCredentials(identifier: String, passcode: String, rememberInJson: Boolean) {
-        viewModelScope.launch {
-            _loginError.value = null
-            if (identifier.trim().isEmpty()) {
-                _loginError.value = "Enter your institutional SSO ID or university email."
-                return@launch
-            }
-            val result = authRepository.signInWithSsoCredentials(identifier, passcode, rememberInJson)
-            if (result == null) {
-                _loginError.value = "Unable to verify institutional SSO credentials."
-            } else {
-                _aiResult.value = null
-                _dismissedRecIds.value = emptySet()
-            }
+        _loginError.value = null
+        val trimmed = identifier.trim()
+        if (trimmed.isEmpty()) {
+            _loginError.value = "Enter your institutional SSO ID or university email."
+            return
         }
+        val matchedName = uiState.value.directoryFaculty.firstOrNull {
+            it.ssoId.equals(trimmed, ignoreCase = true) || it.email.equals(trimmed, ignoreCase = true)
+        }?.fullName ?: trimmed
+        _pendingSignIn.value = PendingSignInRequest(
+            identifier = trimmed,
+            passcode = passcode,
+            rememberInJson = rememberInJson,
+            directoryFacultyId = null,
+            displayLabel = matchedName
+        )
     }
 
     fun signInWithDirectoryFaculty(facultyId: String, rememberInJson: Boolean = true) {
+        _loginError.value = null
+        val matchedName = uiState.value.directoryFaculty
+            .firstOrNull { it.id == facultyId }
+            ?.fullName
+            ?: "Institutional Faculty"
+        _pendingSignIn.value = PendingSignInRequest(
+            identifier = "",
+            passcode = "",
+            rememberInJson = rememberInJson,
+            directoryFacultyId = facultyId,
+            displayLabel = matchedName
+        )
+    }
+
+    fun completePendingSignIn() {
+        val pending = _pendingSignIn.value ?: return
         viewModelScope.launch {
-            _loginError.value = null
             _aiResult.value = null
             _dismissedRecIds.value = emptySet()
-            authRepository.signInWithDirectoryFaculty(facultyId, rememberInJson)
+            if (pending.directoryFacultyId != null) {
+                authRepository.signInWithDirectoryFaculty(pending.directoryFacultyId, pending.rememberInJson)
+            } else {
+                val result = authRepository.signInWithSsoCredentials(
+                    pending.identifier,
+                    pending.passcode,
+                    pending.rememberInJson
+                )
+                if (result == null) {
+                    _loginError.value = "Unable to verify institutional SSO credentials."
+                }
+            }
+            _pendingSignIn.value = null
         }
     }
 
@@ -599,6 +633,14 @@ class TimetableViewModel(
         val logs: List<AutoUpdateLog>
     )
 
+    private data class PendingSignInRequest(
+        val identifier: String,
+        val passcode: String,
+        val rememberInJson: Boolean,
+        val directoryFacultyId: String?,
+        val displayLabel: String
+    )
+
     private data class UiControlsTuple(
         val viewMode: TimetableViewMode,
         val searchQuery: String,
@@ -606,7 +648,8 @@ class TimetableViewModel(
         val aiResult: AiRecommendationResult?,
         val isGeneratingAi: Boolean,
         val isPreparing: Boolean,
-        val loginError: String?
+        val loginError: String?,
+        val pendingSignInLabel: String?
     )
 
     companion object {

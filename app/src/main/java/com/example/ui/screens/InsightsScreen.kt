@@ -97,33 +97,33 @@ fun InsightsScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item(key = "insights_header") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Historical Advisor",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Text(
-                        text = "Intelligent recommendations for ${uiState.selectedSemester?.name ?: "current term"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            SectionEditorialHeader(
+                eyebrow = "AI Schedule Intelligence",
+                title = "Historical Advisor",
+                subtitle = "Intelligent recommendations for ${uiState.selectedSemester?.name ?: "current term"}",
+                trailingContent = {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+                        )
+                    ) {
+                        IconButton(
+                            onClick = onRefreshRecommendations,
+                            enabled = !uiState.isGeneratingAi,
+                            modifier = Modifier.testTag("refresh_ai_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "Refresh recommendations",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
-                IconButton(
-                    onClick = onRefreshRecommendations,
-                    enabled = !uiState.isGeneratingAi,
-                    modifier = Modifier.testTag("refresh_ai_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = "Refresh recommendations"
-                    )
-                }
-            }
+            )
         }
 
         item(key = "sample_ai_notice") {
