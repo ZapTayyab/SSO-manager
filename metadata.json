@@ -1,0 +1,6 @@
+{
+  "name": "SSO Timetable",
+  "description": "Faculty teaching timetable management with institutional SSO, historical scheduling insights, conflict detection, workload balancing, and AI-powered semester recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

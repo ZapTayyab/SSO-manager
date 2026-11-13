@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">SSO Timetable</string>
+    <string name="sso_portal_title">Institutional SSO Portal</string>
+    <string name="sso_portal_subtitle">Sign in with your university Single Sign-On ID to view, balance, and automate your teaching timetable.</string>
+    <string name="sso_sign_in_button">Sign in with Institutional SSO</string>
+    <string name="sso_id_label">Institutional SSO ID or Email</string>
+    <string name="sso_passcode_label">SSO Access Code (Optional for Demo)</string>
+    <string name="sso_directory_title">Quick Faculty Directory Sign-In</string>
+    <string name="nav_timetable">Timetable</string>
+    <string name="nav_insights">Advisor</string>
+    <string name="nav_workload">Workload</string>
+    <string name="nav_profile">SSO Profile</string>
+    <string name="ai_sample_notice_title">Sample AI Insights Mode</string>
+    <string name="ai_sample_notice_body">AI schedule synthesis is running in sample mode using local historical patterns. Enable Firebase AI Logic in project settings for live Gemini analysis.</string>
+    <string name="action_auto_resolve">Auto-Resolve</string>
+    <string name="action_add_session">Add Class</string>
+    <string name="action_prepare_semester">Auto-Prepare Semester</string>
+    <string name="action_sign_out">Sign Out of SSO</string>
+    <string name="empty_schedule_title">No Classes Scheduled Yet</string>
+    <string name="empty_schedule_subtitle">Add a teaching session manually or let the Historical Advisor auto-prepare this semester from your past experience.</string>
+    <string name="notification_channel_conflicts_name">Timetable Conflict Alerts</string>
+    <string name="notification_channel_conflicts_desc">Alerts when overlapping teaching times or venue double-bookings are detected.</string>
+</resources>
